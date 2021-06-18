@@ -1,0 +1,204 @@
+###
+# Notes
+# -----
+# 
+# • All components of this system are run using docker compose, except Plex. Plex is run natively on mac-os
+#   so the the GPU accelerated transcoding can be used. Currently it is not possible do do this with docker
+#   on mac.
+#
+# • All configuration data for each of the component of the system is stored on the local SSD
+#   for fast access. It is stored under ~/media-server/appdata/<app-name>. This includes plex.
+#   For this to work with plex, the config directory was moved to ~/media-server/appdata/Plex Media Server
+#   and a symlink created in ~/Library/Application Support/Plex Media Server, where plex looks.
+#
+# • Sonarr and Radarr can use hard links when transferring the files from the download location
+#   to the location where Plex will see them. This allows torrents to seed, while still being added
+#   to the media library. To make this work, the Sonarr and Radarr containers need to see the
+#   downloads directory and the media directory as one filesystem. So, they see a file structure like this
+#    
+#   /data/
+#      /downloads/tv
+#      /downloads/movies
+#      /media/tv
+#      /media/movies
+#
+#   Also, I was not able to get hard links to work when using SMB or AFP to mount the NAS volume.
+#   It does work when using NFS though, so the NAS is mounted via a docker NFS volume.
+#
+# • I ran into some issues where network connections between images would start failing.
+#    
+#   Possible fix: Disable the connection limit in the docker daemon 
+#   In `~/Library/Group\ Containers/group.com.docker/settings.json` set `vpnKitMaxConnections=0`
+#
+###
+
+version: "3.8"
+services:
+
+  # Radarr monitors and tracks movies, searches for downloads
+  # from indexers and submits them to a download client.
+  radarr:
+    container_name: radarr
+    image: ghcr.io/hotio/radarr:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    network_mode: bridge
+    ports:
+      - 7878:7878
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${BASE_APP_DATA_DIR}/radarr:/config
+      - mediaserver_nfs:/data:nocopy
+
+  # Radarr monitors and tracks tv shows, searches for downloads
+  # from indexers and submits them to a download client.
+  sonarr:
+    container_name: sonarr
+    image: ghcr.io/hotio/sonarr:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    network_mode: bridge
+    ports:
+      - 8989:8989
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${BASE_APP_DATA_DIR}/sonarr:/config
+      - mediaserver_nfs:/data:nocopy
+
+  # Jacket is a middle-man between Sonarr/Radarr and the indexer sites.
+  # It integrates with a vast array of indexers, and exposes their results
+  # in a few common formats that are then consumed by Sonarr/Radarr
+  jackett:
+    container_name: jackett
+    image: ghcr.io/hotio/jackett:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    network_mode: bridge
+    ports:
+      - 9117:9117
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${BASE_APP_DATA_DIR}/jackett:/config
+
+  # qBitTorrent is a torrent client with a web UI.
+  # Sonarr/Radarr submit downlaods that they find via indexers
+  # here to actually manage the download.
+  qbittorrent:
+    container_name: qbittorrent
+    image: ghcr.io/hotio/qbittorrent:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    network_mode: bridge
+    ports:
+      - 8080:8080
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${BASE_APP_DATA_DIR}/qbittorrent:/config
+      - mediaserver_nfs:/data:nocopy
+
+  # Since Sonarr/Radarr don't have built in logic to extract archives, and therefore can't
+  # import many downloads, we run unpackerr. This tool integrates with the Sonarr/Radarr queue
+  # to find an items that need to be extracted, and extracts them. Sonarr/Radar can then do the import
+  # operation on the extracted files.
+  unpackerr:
+    container_name: unpackerr
+    image: hotio/unpackerr:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    network_mode: bridge
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${BASE_APP_DATA_DIR}/unpackerr:/config
+      - mediaserver_nfs:/data:nocopy
+
+  # Overseer is a unified interface to discover and explore new movies and tv shows
+  # then request they are downloaded via sonarr/radarr
+  overseerr:
+    container_name: overseerr
+    image: hotio/overseerr:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    network_mode: bridge
+    ports:
+      - 5055:5055
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${BASE_APP_DATA_DIR}/overseerr:/config
+
+  # Organizir provice a UI "shell" with links / embeds of each of the other
+  # tools that are used as part of this system. Organizer is the primary interface
+  # to configure and manage the system.
+  organizr:
+    container_name: organizr
+    image: organizr/organizr
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    network_mode: bridge
+    ports:
+      - 80:80
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+      # - branch=v2-master
+      # - fpm=true
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${BASE_APP_DATA_DIR}/organizr:/config
+
+  # bazarr:
+  #   container_name: bazarr
+  #   image: ghcr.io/hotio/bazarr:latest
+  #   restart: unless-stopped
+  #   logging:
+  #     driver: json-file
+  #   network_mode: bridge
+  #   ports:
+  #     - 6767:6767
+  #   environment:
+  #     - PUID=1000
+  #     - PGID=1000
+  #     - TZ=${TIMEZONE}
+  #   volumes:
+  #     - /etc/localtime:/etc/localtime:ro
+  #     - ${BASE_APP_DATA_DIR}/bazarr:/config
+  #     - ${BASE_DATA_DIR}:/data/media
+
+
+volumes:
+  mediaserver_nfs:
+    driver_opts:
+      type: nfs
+      o: addr=${NAS_HOSTNAME},${NAS_NFS_MOUNT_OPTS}
+      device: ":${NAS_MEDIA_DATA_DIR}"

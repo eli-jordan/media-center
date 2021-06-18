@@ -1,0 +1,8 @@
+TODO
+--
+
+
+- Run startup script at login
+- Setup chrome cast
+- Move the server/NAS out of the office
+
