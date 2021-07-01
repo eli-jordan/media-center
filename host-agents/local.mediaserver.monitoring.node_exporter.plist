@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>local.mediaserver.monitoring.node_exporter</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+      <string>/usr/local/bin/node_exporter</string>
+      <string>--web.listen-address=:9100</string>
+    </array>
+    
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <key>KeepAlive</key>
+    <true/>
+    
+    <key>StandardErrorPath</key>
+    <string>/Users/elijordan/media-server/appdata/node_exporter/stderr.log</string>
+    <key>StandardOutPath</key>
+    <string>/Users/elijordan/media-server/appdata/node_exporter/stdout.log</string>
+  </dict>
+</plist>

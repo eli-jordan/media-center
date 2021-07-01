@@ -29,6 +29,10 @@
 #    
 #   Possible fix: Disable the connection limit in the docker daemon 
 #   In `~/Library/Group\ Containers/group.com.docker/settings.json` set `vpnKitMaxConnections=0`
+#   
+#   This fix didn't appear to make any improvement.
+#
+#   Possible fix: Use a docker newtwork rather than routing all requests via `host.docker.internal`
 #
 ###
 
@@ -43,7 +47,7 @@ services:
     restart: unless-stopped
     logging:
       driver: json-file
-    network_mode: bridge
+    networks: [ mediaserver_net ]
     ports:
       - 7878:7878
     environment:
@@ -63,7 +67,7 @@ services:
     restart: unless-stopped
     logging:
       driver: json-file
-    network_mode: bridge
+    networks: [ mediaserver_net ]
     ports:
       - 8989:8989
     environment:
@@ -84,7 +88,7 @@ services:
     restart: unless-stopped
     logging:
       driver: json-file
-    network_mode: bridge
+    networks:  [ mediaserver_net ]
     ports:
       - 9117:9117
     environment:
@@ -98,19 +102,39 @@ services:
   # qBitTorrent is a torrent client with a web UI.
   # Sonarr/Radarr submit downlaods that they find via indexers
   # here to actually manage the download.
+  # qbittorrent:
+  #   container_name: qbittorrent
+  #   image: ghcr.io/hotio/qbittorrent:latest
+  #   restart: unless-stopped
+  #   logging:
+  #     driver: json-file
+  #   networks: [ mediaserver_net ]
+  #   ports:
+  #     - 8080:8080
+  #   environment:
+  #     - PUID=1000
+  #     - PGID=1000
+  #     - TZ=${TIMEZONE}
+  #   volumes:
+  #     - /etc/localtime:/etc/localtime:ro
+  #     - ${BASE_APP_DATA_DIR}/qbittorrent:/config
+  #     - mediaserver_nfs:/data:nocopy
+
   qbittorrent:
     container_name: qbittorrent
-    image: ghcr.io/hotio/qbittorrent:latest
+    image: ghcr.io/hotio/qflood:latest
     restart: unless-stopped
     logging:
       driver: json-file
-    network_mode: bridge
+    networks: [ mediaserver_net ]
     ports:
       - 8080:8080
+      - 3000:3000
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=${TIMEZONE}
+      - FLOOD_AUTH=false
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${BASE_APP_DATA_DIR}/qbittorrent:/config
@@ -126,7 +150,7 @@ services:
     restart: unless-stopped
     logging:
       driver: json-file
-    network_mode: bridge
+    networks:  [ mediaserver_net ]
     environment:
       - PUID=1000
       - PGID=1000
@@ -144,7 +168,7 @@ services:
     restart: unless-stopped
     logging:
       driver: json-file
-    network_mode: bridge
+    networks: [ mediaserver_net ]
     ports:
       - 5055:5055
     environment:
@@ -164,7 +188,7 @@ services:
     restart: unless-stopped
     logging:
       driver: json-file
-    network_mode: bridge
+    networks: [ mediaserver_net ]
     ports:
       - 80:80
     environment:
@@ -177,24 +201,72 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ${BASE_APP_DATA_DIR}/organizr:/config
 
-  # bazarr:
-  #   container_name: bazarr
-  #   image: ghcr.io/hotio/bazarr:latest
-  #   restart: unless-stopped
-  #   logging:
-  #     driver: json-file
-  #   network_mode: bridge
-  #   ports:
-  #     - 6767:6767
-  #   environment:
-  #     - PUID=1000
-  #     - PGID=1000
-  #     - TZ=${TIMEZONE}
-  #   volumes:
-  #     - /etc/localtime:/etc/localtime:ro
-  #     - ${BASE_APP_DATA_DIR}/bazarr:/config
-  #     - ${BASE_DATA_DIR}:/data/media
 
+  grafana:
+    container_name: grafana
+    image: grafana/grafana
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    networks: [ mediaserver_net ]
+    ports:
+      - 3030:3000
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP='false'
+      - GF_PATHS_CONFIG=/config/grafana.ini
+      - GF_PATHS_DATA=/config/db/
+      - GF_PATHS_LOGS=/config/logs/
+      - GF_PATHS_PLUGINS=/config/plugins/
+      - GF_PATHS_PROVISIONING=/config/provisioning/
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${BASE_APP_DATA_DIR}/grafana:/config
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:v2.1.0
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    networks: [ mediaserver_net ]
+    ports:
+      - 9090:9090
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+    command:
+      - '--config.file=/config/prometheus.yaml'
+      - '--storage.tsdb.path=/config/db/'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${BASE_APP_DATA_DIR}/prometheus:/config
+
+  cadvisor:
+    container_name: cadvisor
+    image: google/cadvisor
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    networks: [ mediaserver_net ]
+    ports:
+      - 8888:8080
+    deploy:
+      mode: global
+    volumes:
+      - /:/rootfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+
+networks:
+  mediaserver_net:
 
 volumes:
   mediaserver_nfs:

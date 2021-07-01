@@ -1,8 +1,11 @@
 TODO
 --
 
+- Possible optimisation for library scans when something new is added
+	https://github.com/Cloudbox/autoscan
 
+- Auto-mount the volume outside docker, for Plex to use.
 - Run startup script at login
 - Setup chrome cast
-- Move the server/NAS out of the office
+- Backup app configs: https://borgbackup.readthedocs.io/en/stable/quickstart.html#automating-backups
 
