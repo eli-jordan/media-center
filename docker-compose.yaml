@@ -3,7 +3,7 @@
 # -----
 # 
 # • All components of this system are run using docker compose, except Plex. Plex is run natively on mac-os
-#   so the the GPU accelerated transcoding can be used. Currently it is not possible do do this with docker
+#   so the the GPU accelerated transcoding can be used. Currently it is not possible to do this with docker
 #   on mac.
 #
 # • All configuration data for each of the component of the system is stored on the local SSD
@@ -99,26 +99,20 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ${BASE_APP_DATA_DIR}/jackett:/config
 
-  # qBitTorrent is a torrent client with a web UI.
-  # Sonarr/Radarr submit downlaods that they find via indexers
-  # here to actually manage the download.
-  # qbittorrent:
-  #   container_name: qbittorrent
-  #   image: ghcr.io/hotio/qbittorrent:latest
-  #   restart: unless-stopped
-  #   logging:
-  #     driver: json-file
-  #   networks: [ mediaserver_net ]
-  #   ports:
-  #     - 8080:8080
-  #   environment:
-  #     - PUID=1000
-  #     - PGID=1000
-  #     - TZ=${TIMEZONE}
-  #   volumes:
-  #     - /etc/localtime:/etc/localtime:ro
-  #     - ${BASE_APP_DATA_DIR}/qbittorrent:/config
-  #     - mediaserver_nfs:/data:nocopy
+  flaresolverr:
+    container_name: flaresolverr
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    networks: [ mediaserver_net ]
+    ports:
+      - 8191:8191
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+      - LOG_LEVEL=info
 
   qbittorrent:
     container_name: qbittorrent
