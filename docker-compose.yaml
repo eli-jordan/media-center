@@ -47,7 +47,6 @@ services:
     restart: unless-stopped
     logging:
       driver: json-file
-    networks: [ mediaserver_net ]
     ports:
       - 7878:7878
     environment:
@@ -57,7 +56,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${BASE_APP_DATA_DIR}/radarr:/config
-      - mediaserver_nfs:/data:nocopy
+      - ${BASE_MEDIA_DATA_DIR}:/data
 
   # Radarr monitors and tracks tv shows, searches for downloads
   # from indexers and submits them to a download client.
@@ -67,7 +66,6 @@ services:
     restart: unless-stopped
     logging:
       driver: json-file
-    networks: [ mediaserver_net ]
     ports:
       - 8989:8989
     environment:
@@ -77,7 +75,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${BASE_APP_DATA_DIR}/sonarr:/config
-      - mediaserver_nfs:/data:nocopy
+      - ${BASE_MEDIA_DATA_DIR}:/data
 
   # Jacket is a middle-man between Sonarr/Radarr and the indexer sites.
   # It integrates with a vast array of indexers, and exposes their results
@@ -88,7 +86,6 @@ services:
     restart: unless-stopped
     logging:
       driver: json-file
-    networks:  [ mediaserver_net ]
     ports:
       - 9117:9117
     environment:
@@ -105,7 +102,6 @@ services:
     restart: unless-stopped
     logging:
       driver: json-file
-    networks: [ mediaserver_net ]
     ports:
       - 8191:8191
     environment:
@@ -120,7 +116,6 @@ services:
     restart: unless-stopped
     logging:
       driver: json-file
-    networks: [ mediaserver_net ]
     ports:
       - 8080:8080
       - 3000:3000
@@ -132,7 +127,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${BASE_APP_DATA_DIR}/qbittorrent:/config
-      - mediaserver_nfs:/data:nocopy
+      - ${BASE_MEDIA_DATA_DIR}:/data
 
   # Since Sonarr/Radarr don't have built in logic to extract archives, and therefore can't
   # import many downloads, we run unpackerr. This tool integrates with the Sonarr/Radarr queue
@@ -140,11 +135,10 @@ services:
   # operation on the extracted files.
   unpackerr:
     container_name: unpackerr
-    image: hotio/unpackerr:latest
+    image: ghcr.io/hotio/unpackerr:latest
     restart: unless-stopped
     logging:
       driver: json-file
-    networks:  [ mediaserver_net ]
     environment:
       - PUID=1000
       - PGID=1000
@@ -152,17 +146,16 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${BASE_APP_DATA_DIR}/unpackerr:/config
-      - mediaserver_nfs:/data:nocopy
+      - ${BASE_MEDIA_DATA_DIR}:/data
 
   # Overseer is a unified interface to discover and explore new movies and tv shows
   # then request they are downloaded via sonarr/radarr
   overseerr:
     container_name: overseerr
-    image: hotio/overseerr:latest
+    image: ghcr.io/hotio/overseerr:latest
     restart: unless-stopped
     logging:
       driver: json-file
-    networks: [ mediaserver_net ]
     ports:
       - 5055:5055
     environment:
@@ -178,13 +171,12 @@ services:
   # to configure and manage the system.
   organizr:
     container_name: organizr
-    image: organizr/organizr
+    image: organizr/organizr:latest
     restart: unless-stopped
     logging:
       driver: json-file
-    networks: [ mediaserver_net ]
     ports:
-      - 80:80
+      - 9999:80
     environment:
       - PUID=1000
       - PGID=1000
@@ -194,77 +186,3 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${BASE_APP_DATA_DIR}/organizr:/config
-
-
-  grafana:
-    container_name: grafana
-    image: grafana/grafana
-    restart: unless-stopped
-    logging:
-      driver: json-file
-    networks: [ mediaserver_net ]
-    ports:
-      - 3030:3000
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=${TIMEZONE}
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP='false'
-      - GF_PATHS_CONFIG=/config/grafana.ini
-      - GF_PATHS_DATA=/config/db/
-      - GF_PATHS_LOGS=/config/logs/
-      - GF_PATHS_PLUGINS=/config/plugins/
-      - GF_PATHS_PROVISIONING=/config/provisioning/
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - ${BASE_APP_DATA_DIR}/grafana:/config
-
-  prometheus:
-    container_name: prometheus
-    image: prom/prometheus:v2.1.0
-    restart: unless-stopped
-    logging:
-      driver: json-file
-    networks: [ mediaserver_net ]
-    ports:
-      - 9090:9090
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=${TIMEZONE}
-    command:
-      - '--config.file=/config/prometheus.yaml'
-      - '--storage.tsdb.path=/config/db/'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - ${BASE_APP_DATA_DIR}/prometheus:/config
-
-  cadvisor:
-    container_name: cadvisor
-    image: google/cadvisor
-    restart: unless-stopped
-    logging:
-      driver: json-file
-    networks: [ mediaserver_net ]
-    ports:
-      - 8888:8080
-    deploy:
-      mode: global
-    volumes:
-      - /:/rootfs:ro
-      - /var/run/docker.sock:/var/run/docker.sock:rw
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-
-networks:
-  mediaserver_net:
-
-volumes:
-  mediaserver_nfs:
-    driver_opts:
-      type: nfs
-      o: addr=${NAS_HOSTNAME},${NAS_NFS_MOUNT_OPTS}
-      device: ":${NAS_MEDIA_DATA_DIR}"
