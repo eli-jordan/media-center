@@ -186,3 +186,23 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${BASE_APP_DATA_DIR}/organizr:/config
+
+  plex:
+    container_name: plex
+    image: plexinc/pms-docker:latest
+    network_mode: host
+    restart: unless-stopped
+    logging:
+      driver: json-file
+    environment:
+      - PLEX_CLAIM=claim-aEGTy9qCLtVdwUJSzLmJ
+      - PUID=1000
+      - GUID=1000
+      - TZ=${TIMEZONE}
+    devices:
+      - /dev/dri
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${BASE_APP_DATA_DIR}/plex/config:/config
+      - ${BASE_APP_DATA_DIR}/plex/transcode:/transcode
+      - ${BASE_MEDIA_DATA_DIR}:/data
