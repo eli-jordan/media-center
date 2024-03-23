@@ -1,20 +1,10 @@
 TODO
 --
 
-- Auto-mount the volume outside docker, for Plex to use.
 
 - Possible optimisation for library scans when something new is added
 	https://github.com/Cloudbox/autoscan
 
 
-- Run startup script at login
-- Setup chrome cast
 - Backup app configs: https://borgbackup.readthedocs.io/en/stable/quickstart.html#automating-backups
-
-- Docker compose launchd daemon
-	- https://github.com/m-housh/compose-up-daemon
-
-- Exporter for CPU temp and fan speed
-	- Simple exporter code https://github.com/gree-gorey/bash-exporter/blob/master/cmd/bash-exporter/bash-exporter.go
-	- CLI to get the data https://github.com/hholtmann/smcFanControl/tree/master/smc-command
 
